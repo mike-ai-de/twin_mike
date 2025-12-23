@@ -2,8 +2,9 @@ import streamlit as st
 import os
 import google.generativeai as genai
 from dotenv import load_dotenv
-from audio_recorder_streamlit import audio_recorder
+import speech_recognition as sr
 import io
+import tempfile
 
 # --- 1. SETUP & CLEAN DESIGN ---
 st.set_page_config(
@@ -11,30 +12,73 @@ st.set_page_config(
     layout="centered"
 )
 
-# Minimalistisches UI + ChatGPT-Style Audio Button
+# Minimalistisches UI - Fixed Input at Bottom
 st.markdown("""
     <style>
-    .main { margin-top: -50px; }
+    .main { 
+        margin-top: -50px;
+        padding-bottom: 180px;
+    }
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
     
-    /* Audio Recorder Styling - ChatGPT Style */
-    .stAudioRecorder {
+    /* Fixed Input Container am unteren Rand */
+    .stChatInputContainer {
         position: fixed;
-        bottom: 20px;
-        right: 20px;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background-color: #0e1117;
+        padding: 1rem;
+        border-top: 1px solid #262730;
         z-index: 1000;
     }
     
-    /* Input Container */
-    .stChatInputContainer {
-        position: relative;
+    /* Chat Messages scrollbar */
+    .stChatMessageContent {
+        max-width: 100%;
     }
     
-    /* Audio Button im Input-Feld */
-    div[data-testid="stChatInput"] {
-        position: relative;
+    /* Mobile Optimierung */
+    @media (max-width: 768px) {
+        .main {
+            padding-bottom: 200px;
+        }
+        .stChatInputContainer {
+            padding: 0.75rem;
+        }
+        .stButton button {
+            width: 100%;
+            padding: 0.75rem;
+        }
+    }
+    
+    /* Clean Button Style */
+    .stButton button {
+        background-color: #2c3e50;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        transition: all 0.3s;
+    }
+    
+    .stButton button:hover {
+        background-color: #34495e;
+    }
+    
+    /* Audio Input Styling */
+    [data-testid="stAudioInput"] {
+        background-color: #1e1e1e;
+        border-radius: 8px;
+        padding: 0.5rem;
+    }
+    
+    /* File Uploader Styling */
+    [data-testid="stFileUploader"] {
+        background-color: #1e1e1e;
+        border-radius: 8px;
+        padding: 0.5rem;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -46,7 +90,7 @@ if not api_key:
     try:
         api_key = st.secrets["GOOGLE_API_KEY"]
     except:
-        st.error("⚠️ Setup-Fehler: API Key fehlt.")
+        st.error("Setup-Fehler: API Key fehlt.")
         st.stop()
 
 genai.configure(api_key=api_key)
@@ -151,27 +195,51 @@ Erkenne automatisch den Kontext und wechsle Tonalität/Stil entsprechend:
 - Brand-Trigger → prägnanter, praxisorientierter Modus
 """
 
-# --- 3. SPEECH-TO-TEXT FUNKTION ---
-def transcribe_audio(audio_bytes):
-    """Konvertiert Audio zu Text via Gemini"""
+# --- 3. SPEECH-TO-TEXT ---
+def transcribe_audio_gemini(audio_data):
+    """Gemini API Transkription"""
     try:
-        # Gemini für Transkription nutzen
         model = genai.GenerativeModel('gemini-2.0-flash')
         
-        # Audio als File-Objekt vorbereiten
-        audio_file = genai.upload_file(
-            io.BytesIO(audio_bytes),
-            mime_type="audio/wav"
-        )
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as tmp_file:
+            tmp_file.write(audio_data)
+            tmp_path = tmp_file.name
         
+        audio_file = genai.upload_file(tmp_path, mime_type="audio/wav")
         response = model.generate_content([
-            "Transkribiere diese Audioaufnahme auf Deutsch. Gib nur den transkribierten Text zurück, ohne zusätzliche Kommentare oder Formatierung.",
+            "Transkribiere diese Audioaufnahme auf Deutsch. Gib nur den transkribierten Text zurück, ohne zusätzliche Kommentare.",
             audio_file
         ])
         
+        os.unlink(tmp_path)
         return response.text.strip()
     except Exception as e:
-        return f"⚠️ Transkriptionsfehler: {str(e)}"
+        return None
+
+def transcribe_audio_google(audio_data):
+    """Google Speech Recognition Fallback"""
+    try:
+        recognizer = sr.Recognizer()
+        audio_io = io.BytesIO(audio_data)
+        
+        with sr.AudioFile(audio_io) as source:
+            audio = recognizer.record(source)
+            text = recognizer.recognize_google(audio, language="de-DE")
+            return text
+    except Exception as e:
+        return None
+
+def transcribe_audio(audio_data):
+    """Kombinierte Transkription"""
+    result = transcribe_audio_gemini(audio_data)
+    if result:
+        return result
+    
+    result = transcribe_audio_google(audio_data)
+    if result:
+        return result
+    
+    return "Transkription fehlgeschlagen. Bitte versuche es erneut."
 
 # --- 4. RESPONSE GENERATOR ---
 def generate_response(prompt, context_mode="Auto-Detect"):
@@ -192,7 +260,6 @@ def generate_response(prompt, context_mode="Auto-Detect"):
             }
         )
         
-        # Chat-History aufbauen (letzte 10 Nachrichten)
         history = []
         for msg in st.session_state.messages[-10:]:
             if msg["role"] == "user":
@@ -206,116 +273,139 @@ def generate_response(prompt, context_mode="Auto-Detect"):
         return response.text
         
     except Exception as e:
-        return f"**Systemfehler:** {str(e)}\n\n*Hinweis: Prüfe API-Key und Rate Limits.*"
+        return f"Systemfehler: {str(e)}"
 
-# --- 5. UI ---
+# --- 5. UI HEADER ---
 st.markdown("### Mike Schweiger AI")
 st.caption("Digital Twin | Executive Mode")
 
+# --- 6. SIDEBAR ---
 with st.sidebar:
-    st.caption("**Systemsteuerung**")
+    st.caption("Systemsteuerung")
     st.markdown("---")
     
-    # Kontextwahl
     context_mode = st.radio(
         "Kontext-Override",
         ["Auto-Detect", "Business", "Privat", "Brand"],
-        index=0,
-        help="Auto-Detect erkennt den Kontext automatisch"
+        index=0
     )
     
     st.markdown("---")
     
-    if st.button("🔄 Reset Memory", type="secondary", use_container_width=True):
+    voice_method = st.selectbox(
+        "Spracheingabe-Methode",
+        ["Browser Native", "File Upload"],
+        help="Browser Native nutzt Mikrofon direkt"
+    )
+    
+    st.markdown("---")
+    
+    if st.button("Reset Memory", type="secondary", use_container_width=True):
         st.session_state.messages = []
-        st.session_state.audio_processed = False
+        if 'audio_processed' in st.session_state:
+            del st.session_state.audio_processed
         st.rerun()
     
     st.markdown("---")
-    st.caption("**Mike DNA:**")
-    st.caption("• Zahlen > Meinungen")
-    st.caption("• Klarheit > Harmonie")
-    st.caption("• Praxis > Theorie")
+    st.caption("Mike DNA:")
+    st.caption("Zahlen > Meinungen")
+    st.caption("Klarheit > Harmonie")
+    st.caption("Praxis > Theorie")
 
-# --- 6. SESSION STATE INIT ---
+# --- 7. SESSION STATE ---
 if "messages" not in st.session_state:
     st.session_state.messages = []
 if "audio_processed" not in st.session_state:
     st.session_state.audio_processed = False
 
-# --- 7. CHAT HISTORY ---
-for message in st.session_state.messages:
-    avatar = "🎯" if message["role"] == "assistant" else "👤"
-    with st.chat_message(message["role"], avatar=avatar):
-        st.markdown(message["content"])
+# --- 8. CHAT HISTORY (scrollable) ---
+chat_container = st.container()
 
-# --- 8. INPUT BEREICH (ChatGPT-Style) ---
-# Container für Audio + Text Input
-input_container = st.container()
+with chat_container:
+    for message in st.session_state.messages:
+        avatar = "MS" if message["role"] == "assistant" else "User"
+        with st.chat_message(message["role"], avatar=avatar):
+            st.markdown(message["content"])
 
-with input_container:
-    col1, col2 = st.columns([6, 1])
+# --- 9. VOICE INPUT (above text input) ---
+if voice_method == "Browser Native":
+    audio_input = st.audio_input("Sprachnachricht aufnehmen")
     
-    with col1:
-        text_input = st.chat_input("Input für Mike...")
-    
-    with col2:
-        st.markdown("<div style='margin-top: 8px;'>", unsafe_allow_html=True)
-        audio_bytes = audio_recorder(
-            text="",
-            recording_color="#e74c3c",
-            neutral_color="#3498db",
-            icon_name="microphone",
-            icon_size="2x",
-            pause_threshold=2.0,
-            sample_rate=16000,
-        )
-        st.markdown("</div>", unsafe_allow_html=True)
-
-# --- 9. AUDIO PROCESSING ---
-if audio_bytes and not st.session_state.audio_processed:
-    st.session_state.audio_processed = True
-    
-    with st.spinner("🎤 Transkribiere Audio..."):
-        transcribed_text = transcribe_audio(audio_bytes)
+    if audio_input and not st.session_state.audio_processed:
+        st.session_state.audio_processed = True
+        audio_bytes = audio_input.read()
         
-        if not transcribed_text.startswith("⚠️"):
-            # User Message hinzufügen
-            st.session_state.messages.append({
-                "role": "user", 
-                "content": f"🎤 {transcribed_text}"
-            })
+        with st.spinner("Transkribiere..."):
+            transcribed_text = transcribe_audio(audio_bytes)
             
-            # Antwort generieren
-            response = generate_response(transcribed_text, context_mode)
-            
-            st.session_state.messages.append({
-                "role": "assistant",
-                "content": response
-            })
-            
-            st.rerun()
-        else:
-            st.error(transcribed_text)
-            st.session_state.audio_processed = False
+            if not transcribed_text.startswith("Transkription fehlgeschlagen"):
+                st.session_state.messages.append({
+                    "role": "user",
+                    "content": f"[Sprache] {transcribed_text}"
+                })
+                
+                response = generate_response(transcribed_text, context_mode)
+                st.session_state.messages.append({
+                    "role": "assistant",
+                    "content": response
+                })
+                
+                st.rerun()
+            else:
+                st.error(transcribed_text)
+                st.session_state.audio_processed = False
+    
+    if not audio_input:
+        st.session_state.audio_processed = False
 
-# Audio processed flag zurücksetzen wenn kein neues Audio
-if not audio_bytes:
-    st.session_state.audio_processed = False
+else:
+    uploaded_file = st.file_uploader(
+        "Audiodatei hochladen",
+        type=['wav', 'mp3', 'm4a', 'ogg'],
+        label_visibility="collapsed"
+    )
+    
+    if uploaded_file and not st.session_state.audio_processed:
+        st.session_state.audio_processed = True
+        audio_bytes = uploaded_file.read()
+        
+        with st.spinner("Transkribiere..."):
+            transcribed_text = transcribe_audio(audio_bytes)
+            
+            if not transcribed_text.startswith("Transkription fehlgeschlagen"):
+                st.session_state.messages.append({
+                    "role": "user",
+                    "content": f"[Sprache] {transcribed_text}"
+                })
+                
+                response = generate_response(transcribed_text, context_mode)
+                st.session_state.messages.append({
+                    "role": "assistant",
+                    "content": response
+                })
+                
+                st.rerun()
+            else:
+                st.error(transcribed_text)
+                st.session_state.audio_processed = False
+    
+    if not uploaded_file:
+        st.session_state.audio_processed = False
 
-# --- 10. TEXT INPUT PROCESSING ---
+# --- 10. TEXT INPUT (Fixed at bottom) ---
+text_input = st.chat_input("Nachricht an Mike...")
+
 if text_input:
-    # User Message
     st.session_state.messages.append({"role": "user", "content": text_input})
     
-    with st.chat_message("user", avatar="👤"):
-        st.markdown(text_input)
-    
-    # Assistant Response
-    with st.chat_message("assistant", avatar="🎯"):
-        with st.spinner("💭"):
-            response = generate_response(text_input, context_mode)
-            st.markdown(response)
+    with chat_container:
+        with st.chat_message("user", avatar="User"):
+            st.markdown(text_input)
+        
+        with st.chat_message("assistant", avatar="MS"):
+            with st.spinner("..."):
+                response = generate_response(text_input, context_mode)
+                st.markdown(response)
     
     st.session_state.messages.append({"role": "assistant", "content": response})
     st.rerun()
