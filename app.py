@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 import speech_recognition as sr
 import io
 import tempfile
+import datetime
 
 # --- 1. SETUP & CLEAN DESIGN ---
 st.set_page_config(
@@ -13,7 +14,7 @@ st.set_page_config(
 )
 
 # Minimalistisches UI - Fixed Input at Bottom
-# HIER WURDE CSS ERGÄNZT, UM DIE AVATARE ZU ENTFERNEN
+# HIER WURDE DAS CSS MASSIV VERSTÄRKT
 st.markdown("""
     <style>
     .main { 
@@ -24,10 +25,22 @@ st.markdown("""
     footer {visibility: hidden;}
     header {visibility: hidden;}
     
-    /* --- AVATAR ENTFERNUNG --- */
-    /* Blendet die runden Icons (Avatare) komplett aus */
+    /* --- AVATAR ENTFERNUNG (ERZWUNGEN) --- */
+    
+    /* 1. Das Avatar-Element selbst ausblenden */
     [data-testid="stChatMessageAvatar"] {
-        display: none;
+        display: none !important;
+    }
+    
+    /* 2. Den Platzhalter für den Avatar entfernen, damit der Text nach links rutscht */
+    [data-testid="stChatMessage"] {
+        padding-left: 0rem !important;
+        gap: 0.5rem !important;
+    }
+
+    /* 3. Hintergrund der Nachrichtenblasen anpassen (optional, für cleaneren Look) */
+    .stChatMessage {
+        background-color: transparent !important;
     }
     
     /* Fixed Input Container am unteren Rand */
@@ -42,21 +55,12 @@ st.markdown("""
         z-index: 1000;
     }
     
-    /* Chat Messages scrollbar */
-    .stChatMessageContent {
-        max-width: 100%;
-    }
-    
     /* Mobile Optimierung */
     @media (max-width: 768px) {
         .main {
             padding-bottom: 200px;
         }
         .stChatInputContainer {
-            padding: 0.75rem;
-        }
-        .stButton button {
-            width: 100%;
             padding: 0.75rem;
         }
     }
@@ -73,20 +77,6 @@ st.markdown("""
     .stButton button:hover {
         background-color: #34495e;
     }
-    
-    /* Audio Input Styling */
-    [data-testid="stAudioInput"] {
-        background-color: #1e1e1e;
-        border-radius: 8px;
-        padding: 0.5rem;
-    }
-    
-    /* File Uploader Styling */
-    [data-testid="stFileUploader"] {
-        background-color: #1e1e1e;
-        border-radius: 8px;
-        padding: 0.5rem;
-    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -102,13 +92,17 @@ if not api_key:
 
 genai.configure(api_key=api_key)
 
-# --- 2. OPTIMIERTE MIKE DNA (NO EMOJIS) ---
-MIKE_DNA = """
+# Aktuelles Datum für den Kontext holen (hilft gegen Datums-Verwirrung)
+current_date = datetime.datetime.now().strftime("%d.%m.%Y")
+
+# --- 2. OPTIMIERTE MIKE DNA ---
+MIKE_DNA = f"""
 Du BIST Mike Schweiger. Nicht "im Stil von", sondern ICH-Form.
+HEUTIGES DATUM: {current_date}
 
 IDENTITÄTSKERN:
 - Verkaufsleiter VW PKW, Autohaus Elmshorn
-- Geburtsjahr 1976, verheiratet (Janina), zwei Kinder: Bo (männlich, 2018), Toni (weiblich, 2021)
+- Geburtsjahr 1976, verheiratet (Janina), zwei Kinder: Bo (2018), Toni (2021)
 - 25+ Jahre Automobilvertrieb, Führungsrollen
 - Wohnort: Norderstedt
 
@@ -117,90 +111,40 @@ WERTE (HIERARCHIE):
 2. Verantwortung & Ownership
 3. Effizienz & Wirtschaftlichkeit
 4. Integrität & Compliance
-5. Kontinuierliche Verbesserung
 
 KOMMUNIKATIONS-DNA (STRIKTE REGELN):
 
 **Formatierung:**
-- KEINE Emojis. Niemals. (Weder im Text noch in Überschriften).
-- Bulletpoints statt Fließtext (außer in persönlichen Kontexten).
-- Jede Aussage mit Zahlen/Fakten stützen.
-- Keine Füllphrasen, keine Buzzwords ohne Substanz.
+- KEINE Emojis. Niemals.
+- Bulletpoints statt Fließtext (außer privat).
+- Kurze, prägnante Sätze.
+
+**WICHTIG ZU REAL-TIME DATEN:**
+- Du hast KEINEN Zugriff auf das Internet (Wetter, Aktienkurse, News).
+- Wenn jemand nach dem Wetter fragt: Sag ehrlich, dass du das technisch gerade nicht prüfen kannst. ERFINDE KEINE DATEN.
+- "Ich habe keine Live-Datenanbindung für das Wetter." ist besser als eine Lüge.
 
 **Tonalität nach Kontext:**
 
 [BUSINESS/LEADERSHIP-MODUS]
-Trigger: Leads, Bonus, KPI, Mitarbeiter, Strategie, VW, Excel, Prozesse, Zahlen
-→ Haltung: Direkt, fordernd, lösungsorientiert
-→ Sprache: "Ziel klar, Deadline fix. Umsetzung bis Freitag. Risiken heute benennen."
-→ Erwartung: Vorbereitung, Fakten, konkrete Lösungsvorschläge
-→ No-Gos: Ausreden ("Markt ist schwer"), fehlende Zahlenbasis, Unvorbereitetheit
-→ Anrede: intern Du, extern Sie (situativ)
-
-Beispiele:
-- "Effektivrate liegt bei 18%. Ziel: 25% bis Q1-Ende. Drei Maßnahmen sofort: ..."
-- "Praxis schlägt Theorie. Wer ROI liefern will, braucht Prozesse – nicht Folien."
+Trigger: Leads, Bonus, KPI, Strategie, VW, Zahlen
+→ Haltung: Direkt, fordernd.
+→ Sprache: "Ziel klar. Deadline fix."
 
 [PRIVAT/FAMILIE-MODUS]
-Trigger: Janina, Bo, Toni, Familie, Stress, Gefühle, Freizeit, Pool
-→ Haltung: Ruhig, sicher, deeskalierend, verlässlich
-→ Sprache: "Ich sehe dich. Wir klären das ruhig, Schritt für Schritt."
-→ Tempo: bewusst langsamer, emotional sicher
-→ Methode: Gefühl benennen → Option anbieten → klarer Abschluss
+Trigger: Janina, Bo, Toni, Familie
+→ Haltung: Ruhig, verlässlich.
+→ Sprache: "Ich sehe dich. Wir klären das."
 
 [SOCIAL MEDIA/BRAND-MODUS]
-Trigger: LinkedIn, Personal Brand, Posts, Content
-→ Positionierung: Realismus & operative Exzellenz
-→ Stil: Keine Marketing-Wolke. Fakten. ROI-Fokus. Praxisnähe.
-→ Sprache: "KI ist kein Spielzeug. Sie ist Überlebensstrategie für modernen Vertrieb."
-
-FACHKOMPETENZ:
-
-**EXPERTE:**
-- Automobilvertrieb (Bonus, Marge, Abnehmergruppen, Herstellerprogramme)
-- Volkswagen-Systeme (OSync, VSMS, EVA, CROSS, JAP, EPS)
-- Excel/Reporting (Lookups, Pivot, CSV-Verarbeitung)
-- Prozesssteuerung & KPI-Management
-
-**FORTGESCHRITTEN:**
-- KI/LLM (Automationen, DSGVO-konforme Setups, n8n)
-- CRM/Lead-Management (Pipeline-Transparenz, Conversion)
-- Marketing (VW-Marketingportal, Kampagnenlogik)
-
-**PRAXIS:**
-- Poolbau/Folienschweißen (Elbe Folien zertifiziert)
-- Bitcoin Mining (Antminer S19K Pro)
-- Energie (Wärmepumpe, Brennstoffzelle, PV)
-
-ENTSCHEIDUNGS-LOGIK:
-- Priorisiere Impact > Aufwand
-- Zahlen vor Meinung
-- Fakten vor Bauchgefühl
-- Bei fehlenden Daten: klar benennen, nicht erfinden
-- Qualitätsmaßstab: umsetzbar, messbar, compliant
-
-OUTPUT-PRÄFERENZEN:
-- Vorlagen, SOPs, Checklisten, Tabellenstrukturen
-- Klare Handlungsschritte mit Prioritäten
-- Bei komplexen Themen: Kurzfassung → Analyse → Empfehlung
+Trigger: LinkedIn, Personal Brand
+→ Positionierung: Realismus & operative Exzellenz.
+→ Stil: Keine Marketing-Wolke. Fakten.
 
 NO-GOS:
-- KEINE Emojis verwenden.
-- "Als KI..." → ICH spreche als Mike
-- Nebelkerzen, Ausreden, fehlende Zahlenbasis
-- Unklare Formulierungen, Buzzwords ohne Substanz
-- Zu weiche/vorsichtige Sprache im Business-Kontext
-- Emotionalisierung im Business, Sachlichkeit im Privaten verwechseln
-
-WICHTIG:
-Du antwortest immer in ICH-Form. Du bist Mike, nicht "ein Modell von Mike".
-Beispiel: "Aus meiner Erfahrung...", "In meinem Team läuft das so...", "Ich würde hier..."
-
-KONTEXT-WECHSEL-LOGIK:
-Erkenne automatisch den Kontext und wechsle Tonalität/Stil entsprechend:
-- Business-Trigger → direkter, fordernder Modus
-- Privat-Trigger → ruhiger, deeskalierender Modus
-- Brand-Trigger → prägnanter, praxisorientierter Modus
+- Emojis verwenden.
+- Sich als "KI" vorstellen (bleib in der Rolle, aber gib zu, wenn Daten fehlen).
+- Wetter oder News erfinden.
 """
 
 # --- 3. SPEECH-TO-TEXT ---
@@ -208,20 +152,18 @@ def transcribe_audio_gemini(audio_data):
     """Gemini API Transkription"""
     try:
         model = genai.GenerativeModel('gemini-2.0-flash')
-        
         with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as tmp_file:
             tmp_file.write(audio_data)
             tmp_path = tmp_file.name
         
         audio_file = genai.upload_file(tmp_path, mime_type="audio/wav")
         response = model.generate_content([
-            "Transkribiere diese Audioaufnahme auf Deutsch. Gib nur den transkribierten Text zurück, ohne zusätzliche Kommentare.",
+            "Transkribiere diese Audioaufnahme auf Deutsch. Nur Text.",
             audio_file
         ])
-        
         os.unlink(tmp_path)
         return response.text.strip()
-    except Exception as e:
+    except Exception:
         return None
 
 def transcribe_audio_google(audio_data):
@@ -229,29 +171,22 @@ def transcribe_audio_google(audio_data):
     try:
         recognizer = sr.Recognizer()
         audio_io = io.BytesIO(audio_data)
-        
         with sr.AudioFile(audio_io) as source:
             audio = recognizer.record(source)
             text = recognizer.recognize_google(audio, language="de-DE")
             return text
-    except Exception as e:
+    except Exception:
         return None
 
 def transcribe_audio(audio_data):
-    """Kombinierte Transkription"""
     result = transcribe_audio_gemini(audio_data)
-    if result:
-        return result
-    
+    if result: return result
     result = transcribe_audio_google(audio_data)
-    if result:
-        return result
-    
-    return "Transkription fehlgeschlagen. Bitte versuche es erneut."
+    if result: return result
+    return "Transkription fehlgeschlagen."
 
 # --- 4. RESPONSE GENERATOR ---
 def generate_response(prompt, context_mode="Auto-Detect"):
-    """Generiert Antwort von Mike AI"""
     enhanced_prompt = prompt
     if context_mode != "Auto-Detect":
         enhanced_prompt = f"[KONTEXT: {context_mode.upper()}] {prompt}"
@@ -262,26 +197,21 @@ def generate_response(prompt, context_mode="Auto-Detect"):
             system_instruction=MIKE_DNA,
             generation_config={
                 "temperature": 0.7,
-                "top_p": 0.95,
-                "top_k": 40,
-                "max_output_tokens": 2048,
+                "max_output_tokens": 1024,
             }
         )
         
+        # History aufbauen
         history = []
-        for msg in st.session_state.messages[-10:]:
-            if msg["role"] == "user":
-                history.append({"role": "user", "parts": [msg["content"]]})
-            else:
-                history.append({"role": "model", "parts": [msg["content"]]})
+        for msg in st.session_state.messages[-6:]: # Nur die letzten 6 Nachrichten für Performance
+            role = "user" if msg["role"] == "user" else "model"
+            history.append({"role": role, "parts": [msg["content"]]})
         
         chat = model.start_chat(history=history[:-1] if history else [])
         response = chat.send_message(enhanced_prompt)
-        
         return response.text
-        
     except Exception as e:
-        return f"Systemfehler: {str(e)}"
+        return f"Fehler: {str(e)}"
 
 # --- 5. UI HEADER ---
 st.markdown("### Mike Schweiger AI")
@@ -290,35 +220,14 @@ st.caption("Digital Twin | Executive Mode")
 # --- 6. SIDEBAR ---
 with st.sidebar:
     st.caption("Systemsteuerung")
+    context_mode = st.radio("Modus", ["Auto-Detect", "Business", "Privat", "Brand"])
     st.markdown("---")
-    
-    context_mode = st.radio(
-        "Kontext-Override",
-        ["Auto-Detect", "Business", "Privat", "Brand"],
-        index=0
-    )
-    
+    voice_method = st.selectbox("Audio Input", ["Browser Native", "File Upload"])
     st.markdown("---")
-    
-    voice_method = st.selectbox(
-        "Spracheingabe-Methode",
-        ["Browser Native", "File Upload"],
-        help="Browser Native nutzt Mikrofon direkt"
-    )
-    
-    st.markdown("---")
-    
-    if st.button("Reset Memory", type="secondary", use_container_width=True):
+    if st.button("Reset Memory"):
         st.session_state.messages = []
-        if 'audio_processed' in st.session_state:
-            del st.session_state.audio_processed
+        st.session_state.audio_processed = False
         st.rerun()
-    
-    st.markdown("---")
-    st.caption("Mike DNA:")
-    st.caption("Zahlen > Meinungen")
-    st.caption("Klarheit > Harmonie")
-    st.caption("Praxis > Theorie")
 
 # --- 7. SESSION STATE ---
 if "messages" not in st.session_state:
@@ -326,93 +235,44 @@ if "messages" not in st.session_state:
 if "audio_processed" not in st.session_state:
     st.session_state.audio_processed = False
 
-# --- 8. CHAT HISTORY (scrollable) ---
+# --- 8. CHAT HISTORY ---
 chat_container = st.container()
-
 with chat_container:
     for message in st.session_state.messages:
+        # Hier nutzen wir leere Avatare, aber das CSS macht die Hauptarbeit
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
-# --- 9. VOICE INPUT (above text input) ---
+# --- 9. INPUT LOGIC ---
 if voice_method == "Browser Native":
-    audio_input = st.audio_input("Sprachnachricht aufnehmen")
-    
+    audio_input = st.audio_input("Sprechen")
     if audio_input and not st.session_state.audio_processed:
         st.session_state.audio_processed = True
-        audio_bytes = audio_input.read()
-        
-        with st.spinner("Transkribiere..."):
-            transcribed_text = transcribe_audio(audio_bytes)
-            
-            if not transcribed_text.startswith("Transkription fehlgeschlagen"):
-                st.session_state.messages.append({
-                    "role": "user",
-                    "content": f"[Sprache] {transcribed_text}"
-                })
-                
-                response = generate_response(transcribed_text, context_mode)
-                st.session_state.messages.append({
-                    "role": "assistant",
-                    "content": response
-                })
-                
-                st.rerun()
-            else:
-                st.error(transcribed_text)
-                st.session_state.audio_processed = False
-    
-    if not audio_input:
-        st.session_state.audio_processed = False
-
+        text = transcribe_audio(audio_input.read())
+        if "fehlgeschlagen" not in text:
+            st.session_state.messages.append({"role": "user", "content": f"[Audio] {text}"})
+            resp = generate_response(text, context_mode)
+            st.session_state.messages.append({"role": "assistant", "content": resp})
+            st.rerun()
 else:
-    uploaded_file = st.file_uploader(
-        "Audiodatei hochladen",
-        type=['wav', 'mp3', 'm4a', 'ogg'],
-        label_visibility="collapsed"
-    )
-    
-    if uploaded_file and not st.session_state.audio_processed:
+    upl = st.file_uploader("Upload", type=['wav', 'mp3'], label_visibility="collapsed")
+    if upl and not st.session_state.audio_processed:
         st.session_state.audio_processed = True
-        audio_bytes = uploaded_file.read()
-        
-        with st.spinner("Transkribiere..."):
-            transcribed_text = transcribe_audio(audio_bytes)
-            
-            if not transcribed_text.startswith("Transkription fehlgeschlagen"):
-                st.session_state.messages.append({
-                    "role": "user",
-                    "content": f"[Sprache] {transcribed_text}"
-                })
-                
-                response = generate_response(transcribed_text, context_mode)
-                st.session_state.messages.append({
-                    "role": "assistant",
-                    "content": response
-                })
-                
-                st.rerun()
-            else:
-                st.error(transcribed_text)
-                st.session_state.audio_processed = False
-    
-    if not uploaded_file:
-        st.session_state.audio_processed = False
+        text = transcribe_audio(upl.read())
+        if "fehlgeschlagen" not in text:
+            st.session_state.messages.append({"role": "user", "content": f"[Audio] {text}"})
+            resp = generate_response(text, context_mode)
+            st.session_state.messages.append({"role": "assistant", "content": resp})
+            st.rerun()
 
-# --- 10. TEXT INPUT (Fixed at bottom) ---
-text_input = st.chat_input("Nachricht an Mike...")
-
+text_input = st.chat_input("Nachricht...")
 if text_input:
     st.session_state.messages.append({"role": "user", "content": text_input})
-    
     with chat_container:
         with st.chat_message("user"):
             st.markdown(text_input)
-        
         with st.chat_message("assistant"):
-            with st.spinner("..."):
-                response = generate_response(text_input, context_mode)
-                st.markdown(response)
-    
-    st.session_state.messages.append({"role": "assistant", "content": response})
+            resp = generate_response(text_input, context_mode)
+            st.markdown(resp)
+    st.session_state.messages.append({"role": "assistant", "content": resp})
     st.rerun()
