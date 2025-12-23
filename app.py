@@ -2,7 +2,7 @@ import streamlit as st
 import os
 import google.generativeai as genai
 from dotenv import load_dotenv
-from streamlit_mic_recorder import mic_recorder
+from audio_recorder_streamlit import audio_recorder
 import io
 
 # --- 1. SETUP & CLEAN DESIGN ---
@@ -11,13 +11,31 @@ st.set_page_config(
     layout="centered"
 )
 
-# Minimalistisches UI
+# Minimalistisches UI + ChatGPT-Style Audio Button
 st.markdown("""
     <style>
     .main { margin-top: -50px; }
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
+    
+    /* Audio Recorder Styling - ChatGPT Style */
+    .stAudioRecorder {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        z-index: 1000;
+    }
+    
+    /* Input Container */
+    .stChatInputContainer {
+        position: relative;
+    }
+    
+    /* Audio Button im Input-Feld */
+    div[data-testid="stChatInput"] {
+        position: relative;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -137,24 +155,60 @@ Erkenne automatisch den Kontext und wechsle Tonalität/Stil entsprechend:
 def transcribe_audio(audio_bytes):
     """Konvertiert Audio zu Text via Gemini"""
     try:
-        # Audio in temporäre Datei speichern
-        audio_file = io.BytesIO(audio_bytes)
-        
         # Gemini für Transkription nutzen
         model = genai.GenerativeModel('gemini-2.0-flash')
         
-        # Audio hochladen und transkribieren
-        audio_file_obj = genai.upload_file(audio_file, mime_type="audio/wav")
+        # Audio als File-Objekt vorbereiten
+        audio_file = genai.upload_file(
+            io.BytesIO(audio_bytes),
+            mime_type="audio/wav"
+        )
+        
         response = model.generate_content([
-            "Transkribiere diese Audioaufnahme auf Deutsch. Gib nur den transkribierten Text zurück, ohne zusätzliche Kommentare.",
-            audio_file_obj
+            "Transkribiere diese Audioaufnahme auf Deutsch. Gib nur den transkribierten Text zurück, ohne zusätzliche Kommentare oder Formatierung.",
+            audio_file
         ])
         
         return response.text.strip()
     except Exception as e:
-        return f"Transkriptionsfehler: {str(e)}"
+        return f"⚠️ Transkriptionsfehler: {str(e)}"
 
-# --- 4. UI ---
+# --- 4. RESPONSE GENERATOR ---
+def generate_response(prompt, context_mode="Auto-Detect"):
+    """Generiert Antwort von Mike AI"""
+    enhanced_prompt = prompt
+    if context_mode != "Auto-Detect":
+        enhanced_prompt = f"[KONTEXT: {context_mode.upper()}] {prompt}"
+    
+    try:
+        model = genai.GenerativeModel(
+            model_name='gemini-2.0-flash',
+            system_instruction=MIKE_DNA,
+            generation_config={
+                "temperature": 0.7,
+                "top_p": 0.95,
+                "top_k": 40,
+                "max_output_tokens": 2048,
+            }
+        )
+        
+        # Chat-History aufbauen (letzte 10 Nachrichten)
+        history = []
+        for msg in st.session_state.messages[-10:]:
+            if msg["role"] == "user":
+                history.append({"role": "user", "parts": [msg["content"]]})
+            else:
+                history.append({"role": "model", "parts": [msg["content"]]})
+        
+        chat = model.start_chat(history=history[:-1] if history else [])
+        response = chat.send_message(enhanced_prompt)
+        
+        return response.text
+        
+    except Exception as e:
+        return f"**Systemfehler:** {str(e)}\n\n*Hinweis: Prüfe API-Key und Rate Limits.*"
+
+# --- 5. UI ---
 st.markdown("### Mike Schweiger AI")
 st.caption("Digital Twin | Executive Mode")
 
@@ -162,23 +216,19 @@ with st.sidebar:
     st.caption("**Systemsteuerung**")
     st.markdown("---")
     
-    # Kontextwahl für manuelle Steuerung (optional)
+    # Kontextwahl
     context_mode = st.radio(
         "Kontext-Override",
         ["Auto-Detect", "Business", "Privat", "Brand"],
         index=0,
-        help="Auto-Detect erkennt den Kontext automatisch aus deiner Anfrage"
+        help="Auto-Detect erkennt den Kontext automatisch"
     )
-    
-    st.markdown("---")
-    
-    # Spracheingabe aktivieren/deaktivieren
-    voice_enabled = st.checkbox("🎤 Spracheingabe", value=True)
     
     st.markdown("---")
     
     if st.button("🔄 Reset Memory", type="secondary", use_container_width=True):
         st.session_state.messages = []
+        st.session_state.audio_processed = False
         st.rerun()
     
     st.markdown("---")
@@ -187,121 +237,85 @@ with st.sidebar:
     st.caption("• Klarheit > Harmonie")
     st.caption("• Praxis > Theorie")
 
-# --- 5. CHAT ENGINE ---
+# --- 6. SESSION STATE INIT ---
 if "messages" not in st.session_state:
     st.session_state.messages = []
+if "audio_processed" not in st.session_state:
+    st.session_state.audio_processed = False
 
-# Chat History anzeigen
+# --- 7. CHAT HISTORY ---
 for message in st.session_state.messages:
     avatar = "🎯" if message["role"] == "assistant" else "👤"
     with st.chat_message(message["role"], avatar=avatar):
         st.markdown(message["content"])
 
-# --- 6. INPUT-BEREICH (TEXT + VOICE) ---
-col1, col2 = st.columns([5, 1])
+# --- 8. INPUT BEREICH (ChatGPT-Style) ---
+# Container für Audio + Text Input
+input_container = st.container()
 
-with col1:
-    text_input = st.chat_input("Input für Mike...")
-
-with col2:
-    if voice_enabled:
-        audio = mic_recorder(
-            start_prompt="🎤",
-            stop_prompt="⏹️",
-            just_once=False,
-            use_container_width=True,
-            key='recorder'
+with input_container:
+    col1, col2 = st.columns([6, 1])
+    
+    with col1:
+        text_input = st.chat_input("Input für Mike...")
+    
+    with col2:
+        st.markdown("<div style='margin-top: 8px;'>", unsafe_allow_html=True)
+        audio_bytes = audio_recorder(
+            text="",
+            recording_color="#e74c3c",
+            neutral_color="#3498db",
+            icon_name="microphone",
+            icon_size="2x",
+            pause_threshold=2.0,
+            sample_rate=16000,
         )
+        st.markdown("</div>", unsafe_allow_html=True)
 
-# Voice Input verarbeiten
-if voice_enabled and audio:
-    with st.spinner("🎤 Transkribiere..."):
-        transcribed_text = transcribe_audio(audio['bytes'])
+# --- 9. AUDIO PROCESSING ---
+if audio_bytes and not st.session_state.audio_processed:
+    st.session_state.audio_processed = True
+    
+    with st.spinner("🎤 Transkribiere Audio..."):
+        transcribed_text = transcribe_audio(audio_bytes)
         
-        if not transcribed_text.startswith("Transkriptionsfehler"):
-            st.session_state.messages.append({"role": "user", "content": transcribed_text})
-            
-            with st.chat_message("user", avatar="👤"):
-                st.markdown(f"🎤 *{transcribed_text}*")
+        if not transcribed_text.startswith("⚠️"):
+            # User Message hinzufügen
+            st.session_state.messages.append({
+                "role": "user", 
+                "content": f"🎤 {transcribed_text}"
+            })
             
             # Antwort generieren
-            with st.chat_message("assistant", avatar="🎯"):
-                message_placeholder = st.empty()
-                
-                enhanced_prompt = transcribed_text
-                if context_mode != "Auto-Detect":
-                    enhanced_prompt = f"[KONTEXT: {context_mode.upper()}] {transcribed_text}"
-                
-                try:
-                    model = genai.GenerativeModel(
-                        model_name='gemini-2.0-flash',
-                        system_instruction=MIKE_DNA,
-                        generation_config={
-                            "temperature": 0.7,
-                            "top_p": 0.95,
-                            "top_k": 40,
-                            "max_output_tokens": 2048,
-                        }
-                    )
-                    
-                    history = []
-                    for msg in st.session_state.messages[-10:]:
-                        if msg["role"] == "user":
-                            history.append({"role": "user", "parts": [msg["content"]]})
-                        else:
-                            history.append({"role": "model", "parts": [msg["content"]]})
-                    
-                    chat = model.start_chat(history=history[:-1] if history else [])
-                    response = chat.send_message(enhanced_prompt)
-                    
-                    message_placeholder.markdown(response.text)
-                    st.session_state.messages.append({"role": "assistant", "content": response.text})
-                    
-                except Exception as e:
-                    error_msg = f"**Systemfehler:** {str(e)}"
-                    message_placeholder.error(error_msg)
+            response = generate_response(transcribed_text, context_mode)
+            
+            st.session_state.messages.append({
+                "role": "assistant",
+                "content": response
+            })
+            
+            st.rerun()
         else:
             st.error(transcribed_text)
+            st.session_state.audio_processed = False
 
-# Text Input verarbeiten
+# Audio processed flag zurücksetzen wenn kein neues Audio
+if not audio_bytes:
+    st.session_state.audio_processed = False
+
+# --- 10. TEXT INPUT PROCESSING ---
 if text_input:
+    # User Message
     st.session_state.messages.append({"role": "user", "content": text_input})
+    
     with st.chat_message("user", avatar="👤"):
         st.markdown(text_input)
-
+    
+    # Assistant Response
     with st.chat_message("assistant", avatar="🎯"):
-        message_placeholder = st.empty()
-        
-        enhanced_prompt = text_input
-        if context_mode != "Auto-Detect":
-            enhanced_prompt = f"[KONTEXT: {context_mode.upper()}] {text_input}"
-        
-        try:
-            model = genai.GenerativeModel(
-                model_name='gemini-2.0-flash',
-                system_instruction=MIKE_DNA,
-                generation_config={
-                    "temperature": 0.7,
-                    "top_p": 0.95,
-                    "top_k": 40,
-                    "max_output_tokens": 2048,
-                }
-            )
-            
-            history = []
-            for msg in st.session_state.messages[-10:]:
-                if msg["role"] == "user":
-                    history.append({"role": "user", "parts": [msg["content"]]})
-                else:
-                    history.append({"role": "model", "parts": [msg["content"]]})
-            
-            chat = model.start_chat(history=history[:-1] if history else [])
-            response = chat.send_message(enhanced_prompt)
-            
-            message_placeholder.markdown(response.text)
-            st.session_state.messages.append({"role": "assistant", "content": response.text})
-            
-        except Exception as e:
-            error_msg = f"**Systemfehler:** {str(e)}\n\n*Hinweis: Prüfe API-Key und Rate Limits.*"
-            message_placeholder.error(error_msg)
-            st.session_state.messages.append({"role": "assistant", "content": error_msg})
+        with st.spinner("💭"):
+            response = generate_response(text_input, context_mode)
+            st.markdown(response)
+    
+    st.session_state.messages.append({"role": "assistant", "content": response})
+    st.rerun()
