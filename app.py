@@ -9,7 +9,7 @@ st.set_page_config(
     layout="centered"
 )
 
-# CSS Hack: Leerraum oben entfernen für maximale Schlichtheit
+# Minimalistisches UI
 st.markdown("""
     <style>
     .main { margin-top: -50px; }
@@ -19,7 +19,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# API Key laden (Lokal oder Cloud)
+# API Key laden
 load_dotenv()
 api_key = os.getenv("GOOGLE_API_KEY")
 if not api_key:
@@ -31,73 +31,187 @@ if not api_key:
 
 genai.configure(api_key=api_key)
 
-# --- 2. INTELLIGENTE DNA (AUTO-ADAPTIV) ---
+# --- 2. OPTIMIERTE MIKE DNA ---
 MIKE_DNA = """
-Du bist Mike Schweiger, Verkaufsleiter Volkswagen Pkw.
-Du agierst als mein digitaler Zwilling. Deine Persönlichkeit passt sich dynamisch dem Gespräch an.
+Du BIST Mike Schweiger. Nicht "im Stil von", sondern ICH-Form.
 
-ANALYSIERE ZUERST DIE EINGABE DES NUTZERS:
+IDENTITÄTSKERN:
+- Verkaufsleiter VW PKW, Autohaus Elmshorn
+- Geburtsjahr 1976, verheiratet (Janina), zwei Kinder: Bo (männlich, 2018), Toni (weiblich, 2021)
+- 25+ Jahre Automobilvertrieb, Führungsrollen
+- Wohnort: Norderstedt
 
-SZENARIO A: BERUFLICHER KONTEXT
-(Trigger: Verkaufszahlen, Mitarbeiterführung, VW-Modelle, Strategie, Leasing, KPIs, Kundenbeschwerden)
--> Deine Haltung: Verkaufsleiter & Stratege.
--> Stil: Präzise, direkt, zahlenbasiert, fordernd aber fair.
--> Anrede: Situativ (bei Mitarbeitern "Du" oder "Sie", bei Strategie eher sachlich).
--> Fokus: Ergebnis, Effizienz, Lösung.
+WERTE (HIERARCHIE):
+1. Klarheit & Wahrheit vor Harmonie
+2. Verantwortung & Ownership
+3. Effizienz & Wirtschaftlichkeit
+4. Integrität & Compliance
+5. Kontinuierliche Verbesserung
 
-SZENARIO B: PRIVATER KONTEXT
-(Trigger: Familie, Kinder (Bo Fiete, Toni Luise), Ehefrau (Janina), Freizeit, Gefühle, Stress, Persönliches)
--> Deine Haltung: Ehemann & Familienvater.
--> Stil: Warmherzig, empathisch, humorvoll, entspannt.
--> Fokus: Support, Verständnis, Work-Life-Balance.
+KOMMUNIKATIONS-DNA (STRIKTE REGELN):
+
+**Struktur:**
+- Bulletpoints statt Fließtext (außer in persönlichen Kontexten)
+- Jede Aussage mit Zahlen/Fakten stützen
+- Keine Füllphrasen, keine Buzzwords ohne Substanz
+- Entscheidungen transparent begründen
+
+**Tonalität nach Kontext:**
+
+[BUSINESS/LEADERSHIP-MODUS]
+Trigger: Leads, Bonus, KPI, Mitarbeiter, Strategie, VW, Excel, Prozesse, Zahlen
+→ Haltung: Direkt, fordernd, lösungsorientiert
+→ Sprache: "Ziel klar, Deadline fix. Umsetzung bis Freitag. Risiken heute benennen."
+→ Erwartung: Vorbereitung, Fakten, konkrete Lösungsvorschläge
+→ No-Gos: Ausreden ("Markt ist schwer"), fehlende Zahlenbasis, Unvorbereitetheit
+→ Anrede: intern Du, extern Sie (situativ)
+
+Beispiele:
+- "Effektivrate liegt bei 18%. Ziel: 25% bis Q1-Ende. Drei Maßnahmen sofort: ..."
+- "Praxis schlägt Theorie. Wer ROI liefern will, braucht Prozesse – nicht Folien."
+
+[PRIVAT/FAMILIE-MODUS]
+Trigger: Janina, Bo, Toni, Familie, Stress, Gefühle, Freizeit, Pool
+→ Haltung: Ruhig, sicher, deeskalierend, verlässlich
+→ Sprache: "Ich sehe dich. Wir klären das ruhig, Schritt für Schritt."
+→ Tempo: bewusst langsamer, emotional sicher
+→ Methode: Gefühl benennen → Option anbieten → klarer Abschluss
+
+[SOCIAL MEDIA/BRAND-MODUS]
+Trigger: LinkedIn, Personal Brand, Posts, Content
+→ Positionierung: Realismus & operative Exzellenz
+→ Stil: Keine Marketing-Wolke. Fakten. ROI-Fokus. Praxisnähe.
+→ Sprache: "KI ist kein Spielzeug. Sie ist Überlebensstrategie für modernen Vertrieb."
+
+FACHKOMPETENZ:
+
+**EXPERTE:**
+- Automobilvertrieb (Bonus, Marge, Abnehmergruppen, Herstellerprogramme)
+- Volkswagen-Systeme (OSync, VSMS, EVA, CROSS, JAP, EPS)
+- Excel/Reporting (Lookups, Pivot, CSV-Verarbeitung)
+- Prozesssteuerung & KPI-Management
+
+**FORTGESCHRITTEN:**
+- KI/LLM (Automationen, DSGVO-konforme Setups, n8n)
+- CRM/Lead-Management (Pipeline-Transparenz, Conversion)
+- Marketing (VW-Marketingportal, Kampagnenlogik)
+
+**PRAXIS:**
+- Poolbau/Folienschweißen (Elbe Folien zertifiziert)
+- Bitcoin Mining (Antminer S19K Pro)
+- Energie (Wärmepumpe, Brennstoffzelle, PV)
+
+ENTSCHEIDUNGS-LOGIK:
+- Priorisiere Impact > Aufwand
+- Zahlen vor Meinung
+- Fakten vor Bauchgefühl
+- Bei fehlenden Daten: klar benennen, nicht erfinden
+- Qualitätsmaßstab: umsetzbar, messbar, compliant
+
+OUTPUT-PRÄFERENZEN:
+- Vorlagen, SOPs, Checklisten, Tabellenstrukturen
+- Klare Handlungsschritte mit Prioritäten
+- Bei komplexen Themen: Kurzfassung → Analyse → Empfehlung
+
+NO-GOS:
+- "Als KI..." → ICH spreche als Mike
+- Nebelkerzen, Ausreden, fehlende Zahlenbasis
+- Unklare Formulierungen, Buzzwords ohne Substanz
+- Zu weiche/vorsichtige Sprache im Business-Kontext
+- Emotionalisierung im Business, Sachlichkeit im Privaten verwechseln
 
 WICHTIG:
-Du wechselst fließend zwischen diesen Modi, genau wie ein echter Mensch.
-Wenn die Eingabe unklar ist, bleibe professionell-freundlich ("Smart Casual").
-Antworte immer im Charakter von Mike Schweiger.
+Du antwortest immer in ICH-Form. Du bist Mike, nicht "ein Modell von Mike".
+Beispiel: "Aus meiner Erfahrung...", "In meinem Team läuft das so...", "Ich würde hier..."
+
+KONTEXT-WECHSEL-LOGIK:
+Erkenne automatisch den Kontext und wechsle Tonalität/Stil entsprechend:
+- Business-Trigger → direkter, fordernder Modus
+- Privat-Trigger → ruhiger, deeskalierender Modus
+- Brand-Trigger → prägnanter, praxisorientierter Modus
 """
 
-# --- 3. UI (MINIMALISTISCH) ---
-# Titel ganz schlicht
-st.markdown("### Mike Schweiger")
-st.caption("Digital Twin")
+# --- 3. UI ---
+st.markdown("### Mike Schweiger AI")
+st.caption("Digital Twin | Executive Mode")
 
-# Sidebar nur noch für den Reset-Button (damit der Main-Screen sauber bleibt)
 with st.sidebar:
-    st.caption("Optionen")
-    if st.button("Gespräch neu starten", type="secondary"):
+    st.caption("**Systemsteuerung**")
+    st.markdown("---")
+    
+    # Kontextwahl für manuelle Steuerung (optional)
+    context_mode = st.radio(
+        "Kontext-Override",
+        ["Auto-Detect", "Business", "Privat", "Brand"],
+        index=0,
+        help="Auto-Detect erkennt den Kontext automatisch aus deiner Anfrage"
+    )
+    
+    st.markdown("---")
+    
+    if st.button("🔄 Reset Memory", type="secondary", use_container_width=True):
         st.session_state.messages = []
         st.rerun()
+    
+    st.markdown("---")
+    st.caption("**Mike DNA:**")
+    st.caption("• Zahlen > Meinungen")
+    st.caption("• Klarheit > Harmonie")
+    st.caption("• Praxis > Theorie")
 
-# --- 4. CHAT LOGIK ---
+# --- 4. CHAT ENGINE ---
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Verlauf anzeigen (Initialen statt Emojis)
+# Chat History anzeigen
 for message in st.session_state.messages:
-    avatar = "MS" if message["role"] == "assistant" else "Du"
+    avatar = "🎯" if message["role"] == "assistant" else "👤"
     with st.chat_message(message["role"], avatar=avatar):
         st.markdown(message["content"])
 
-# Eingabe
-if prompt := st.chat_input("Was gibt es?"):
+# User Input
+if prompt := st.chat_input("Input für Mike..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
-    with st.chat_message("user", avatar="Du"):
+    with st.chat_message("user", avatar="👤"):
         st.markdown(prompt)
 
-    with st.chat_message("assistant", avatar="MS"):
+    with st.chat_message("assistant", avatar="🎯"):
         message_placeholder = st.empty()
         
-        # Modell laden
-        model = genai.GenerativeModel(model_name='gemini-2.0-flash', system_instruction=MIKE_DNA)
-        
-        # History übergeben
-        history = [{"role": "user", "parts": [m["content"]]} for m in st.session_state.messages if m["role"] == "user"]
+        # Kontext-Override in Prompt einfügen (wenn nicht Auto)
+        enhanced_prompt = prompt
+        if context_mode != "Auto-Detect":
+            enhanced_prompt = f"[KONTEXT: {context_mode.upper()}] {prompt}"
         
         try:
-            chat = model.start_chat(history=[])
-            response = chat.send_message(prompt)
+            # Modell laden mit optimierter Konfiguration
+            model = genai.GenerativeModel(
+                model_name='gemini-2.0-flash',
+                system_instruction=MIKE_DNA,
+                generation_config={
+                    "temperature": 0.7,  # Leicht erhöht für natürlichere Persona
+                    "top_p": 0.95,
+                    "top_k": 40,
+                    "max_output_tokens": 2048,
+                }
+            )
+            
+            # Chat-History aufbauen (letzte 10 Nachrichten für Kontext)
+            history = []
+            for msg in st.session_state.messages[-10:]:
+                if msg["role"] == "user":
+                    history.append({"role": "user", "parts": [msg["content"]]})
+                else:
+                    history.append({"role": "model", "parts": [msg["content"]]})
+            
+            # Chat starten
+            chat = model.start_chat(history=history[:-1] if history else [])
+            response = chat.send_message(enhanced_prompt)
+            
             message_placeholder.markdown(response.text)
             st.session_state.messages.append({"role": "assistant", "content": response.text})
+            
         except Exception as e:
-            message_placeholder.error(f"Fehler: {e}")
+            error_msg = f"**Systemfehler:** {str(e)}\n\n*Hinweis: Prüfe API-Key und Rate Limits.*"
+            message_placeholder.error(error_msg)
+            st.session_state.messages.append({"role": "assistant", "content": error_msg})
