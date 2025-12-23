@@ -13,6 +13,7 @@ st.set_page_config(
 )
 
 # Minimalistisches UI - Fixed Input at Bottom
+# HIER WURDE CSS ERGÄNZT, UM DIE AVATARE ZU ENTFERNEN
 st.markdown("""
     <style>
     .main { 
@@ -22,6 +23,12 @@ st.markdown("""
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
+    
+    /* --- AVATAR ENTFERNUNG --- */
+    /* Blendet die runden Icons (Avatare) komplett aus */
+    [data-testid="stChatMessageAvatar"] {
+        display: none;
+    }
     
     /* Fixed Input Container am unteren Rand */
     .stChatInputContainer {
