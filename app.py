@@ -323,8 +323,7 @@ chat_container = st.container()
 
 with chat_container:
     for message in st.session_state.messages:
-        avatar = "MS" if message["role"] == "assistant" else "User"
-        with st.chat_message(message["role"], avatar=avatar):
+        with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
 # --- 9. VOICE INPUT (above text input) ---
@@ -399,10 +398,10 @@ if text_input:
     st.session_state.messages.append({"role": "user", "content": text_input})
     
     with chat_container:
-        with st.chat_message("user", avatar="User"):
+        with st.chat_message("user"):
             st.markdown(text_input)
         
-        with st.chat_message("assistant", avatar="MS"):
+        with st.chat_message("assistant"):
             with st.spinner("..."):
                 response = generate_response(text_input, context_mode)
                 st.markdown(response)
