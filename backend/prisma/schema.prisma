@@ -1,0 +1,270 @@
+// Voice KB Interview Agent - Database Schema
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [vector]
+}
+
+// ============================================================================
+// CORE ENTITIES
+// ============================================================================
+
+model Person {
+  id          String   @id @default(cuid())
+  email       String?  @unique
+  displayName String   @map("display_name")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  sessions        Session[]
+  facts           Fact[]
+  timelineEntries TimelineEntry[]
+  skills          Skill[]
+  preferences     Preference[]
+  artifacts       Artifact[]
+  openQuestions   OpenQuestion[]
+
+  @@map("persons")
+}
+
+model Session {
+  id        String    @id @default(cuid())
+  personId  String    @map("person_id")
+  startedAt DateTime  @default(now()) @map("started_at")
+  endedAt   DateTime? @map("ended_at")
+  status    String    @default("active") // active, paused, completed, abandoned
+  module    String?   // current module being interviewed
+  meta      Json?     // session metadata (device, version, etc.)
+
+  person    Person    @relation(fields: [personId], references: [id], onDelete: Cascade)
+  turns     Turn[]
+  summaries Summary[]
+
+  @@index([personId])
+  @@index([status])
+  @@map("sessions")
+}
+
+model Turn {
+  id         String    @id @default(cuid())
+  sessionId  String    @map("session_id")
+  timestamp  DateTime  @default(now())
+  speaker    String    // 'agent' or 'user'
+  transcript String    @db.Text
+  audioUrl   String?   @map("audio_url")
+  meta       Json?     // audio duration, confidence, etc.
+  status     String    @default("completed") // processing, completed, failed
+
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([timestamp])
+  @@map("turns")
+}
+
+// ============================================================================
+// KNOWLEDGE BASE ENTITIES
+// ============================================================================
+
+model Fact {
+  id            String    @id @default(cuid())
+  personId      String    @map("person_id")
+  factType      String    @map("fact_type") // current_role, location, education, certification, etc.
+  value         Json      // flexible structure based on factType
+  confidence    Float     @default(1.0) // 0.0 to 1.0
+  sourceTurnIds String[]  @map("source_turn_ids")
+  validFrom     DateTime  @default(now()) @map("valid_from")
+  validTo       DateTime? @map("valid_to") // null = currently valid
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  version       Int       @default(1)
+
+  person Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@index([personId, factType])
+  @@index([validFrom, validTo])
+  @@map("facts")
+}
+
+model TimelineEntry {
+  id               String    @id @default(cuid())
+  personId         String    @map("person_id")
+  startDate        String    // YYYY-MM or YYYY (flexible date format)
+  endDate          String?   @map("end_date") // null = current
+  org              String
+  role             String
+  responsibilities String[]  @default([])
+  achievements     String[]  @default([])
+  kpis             Json?     // [{"name": "...", "value": "..."}]
+  reasonForChange  String?   @map("reason_for_change")
+  sourceTurnIds    String[]  @map("source_turn_ids")
+  confidence       Float     @default(1.0)
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+  version          Int       @default(1)
+
+  person Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@index([personId])
+  @@index([startDate])
+  @@map("timeline_entries")
+}
+
+model Skill {
+  id            String   @id @default(cuid())
+  personId      String   @map("person_id")
+  skill         String
+  level         Int      @default(3) // 1-5
+  evidence      String?  @db.Text
+  tags          String[] @default([])
+  sourceTurnIds String[] @map("source_turn_ids")
+  confidence    Float    @default(1.0)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  version       Int      @default(1)
+
+  person Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@index([personId])
+  @@index([skill])
+  @@map("skills")
+}
+
+model Preference {
+  id            String   @id @default(cuid())
+  personId      String   @map("person_id")
+  category      String   // communication, leadership, workstyle, tools, etc.
+  value         Json     // flexible structure
+  sourceTurnIds String[] @map("source_turn_ids")
+  confidence    Float    @default(1.0)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  version       Int      @default(1)
+
+  person Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@index([personId, category])
+  @@map("preferences")
+}
+
+model Artifact {
+  id            String   @id @default(cuid())
+  personId      String   @map("person_id")
+  artifactType  String   @map("artifact_type") // template, process, checklist, playbook, link, file
+  title         String
+  contentRef    String?  @map("content_ref") // file path or URL
+  summary       String?  @db.Text
+  tags          String[] @default([])
+  sourceTurnIds String[] @map("source_turn_ids")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  person Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@index([personId])
+  @@index([artifactType])
+  @@map("artifacts")
+}
+
+model OpenQuestion {
+  id            String   @id @default(cuid())
+  personId      String   @map("person_id")
+  module        String
+  question      String   @db.Text
+  priority      String   // H, M, L
+  status        String   @default("open") // open, answered, dropped
+  reason        String?  // missing_detail, contradiction, needs_clarification
+  sourceTurnIds String[] @map("source_turn_ids")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  person Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@index([personId, status])
+  @@index([priority])
+  @@map("open_questions")
+}
+
+model Summary {
+  id            String   @id @default(cuid())
+  sessionId     String   @map("session_id")
+  module        String
+  summaryText   String   @map("summary_text") @db.Text
+  extractedJson Json     @map("extracted_json")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@map("summaries")
+}
+
+// ============================================================================
+// SEMANTIC SEARCH (pgvector)
+// ============================================================================
+
+model Embedding {
+  id         String                        @id @default(cuid())
+  entityType String                        @map("entity_type") // fact, timeline_entry, skill, etc.
+  entityId   String                        @map("entity_id")
+  text       String                        @db.Text
+  embedding  Unsupported("vector(512)")?
+  createdAt  DateTime                      @default(now()) @map("created_at")
+
+  @@index([entityType, entityId])
+  @@map("embeddings")
+}
+
+// ============================================================================
+// AUTH & MAGIC LINKS
+// ============================================================================
+
+model MagicLink {
+  id        String    @id @default(cuid())
+  email     String
+  token     String    @unique
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([email])
+  @@index([token])
+  @@map("magic_links")
+}
+
+// ============================================================================
+// SYSTEM / OBSERVABILITY
+// ============================================================================
+
+model SystemLog {
+  id        String   @id @default(cuid())
+  level     String   // info, warn, error
+  message   String   @db.Text
+  meta      Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([level])
+  @@index([createdAt])
+  @@map("system_logs")
+}
+
+model CostTracking {
+  id           String   @id @default(cuid())
+  sessionId    String?  @map("session_id")
+  service      String   // openai_whisper, openai_tts, openai_gpt4, openai_embedding
+  units        Float    // tokens, minutes, chars, etc.
+  costUsd      Float    @map("cost_usd")
+  meta         Json?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([sessionId])
+  @@index([service])
+  @@index([createdAt])
+  @@map("cost_tracking")
+}
