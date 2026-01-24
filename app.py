@@ -328,27 +328,43 @@ with chat_container:
 # Audio Input
 if voice_method == "Browser Native":
     audio_input = st.audio_input("Sprechen")
+
+    # WICHTIG: wenn kein Audio vorhanden ist, Blockade lösen
+    if audio_input is None:
+        st.session_state.audio_processed = False
+
     if audio_input and not st.session_state.audio_processed:
         st.session_state.audio_processed = True
         text = transcribe_audio(audio_input.read())
         if "fehlgeschlagen" not in text:
             st.session_state.messages.append({"role": "user", "content": f"[Audio] {text}"})
             db_save_message("user", f"[Audio] {text}", context_mode)
+
             resp = generate_response(text, context_mode)
+
             st.session_state.messages.append({"role": "assistant", "content": resp})
             db_save_message("assistant", resp, context_mode)
+
             st.rerun()
 else:
     upl = st.file_uploader("Upload", type=['wav', 'mp3'], label_visibility="collapsed")
+
+    # WICHTIG: wenn kein Upload vorhanden ist, Blockade lösen
+    if upl is None:
+        st.session_state.audio_processed = False
+
     if upl and not st.session_state.audio_processed:
         st.session_state.audio_processed = True
         text = transcribe_audio(upl.read())
         if "fehlgeschlagen" not in text:
             st.session_state.messages.append({"role": "user", "content": f"[Audio] {text}"})
             db_save_message("user", f"[Audio] {text}", context_mode)
+
             resp = generate_response(text, context_mode)
+
             st.session_state.messages.append({"role": "assistant", "content": resp})
             db_save_message("assistant", resp, context_mode)
+
             st.rerun()
 
 # Text Input
