@@ -301,7 +301,7 @@ with st.sidebar:
         con.commit()
         con.close()
         st.session_state.messages = []
-        st.session_state.audio_processed = False
+        st.session_state.audio_counter = 0
         st.rerun()
 
 
@@ -312,8 +312,9 @@ if "messages" not in st.session_state:
     for ts, role, mode, content in db_load_recent(limit=50):
         st.session_state.messages.append({"role": role, "content": content})
 
-if "audio_processed" not in st.session_state:
-    st.session_state.audio_processed = False
+# WICHTIG: Counter für Audio-Widget, damit es nach jeder Verarbeitung neu gerendert wird
+if "audio_counter" not in st.session_state:
+    st.session_state.audio_counter = 0
 
 
 # --- 9. CHAT HISTORY ---
@@ -327,14 +328,11 @@ with chat_container:
 # --- 10. INPUT LOGIC ---
 # Audio Input
 if voice_method == "Browser Native":
-    audio_input = st.audio_input("Sprechen")
+    # WICHTIG: Eindeutiger Key, der sich nach jeder Verarbeitung ändert
+    # Dadurch wird das Widget neu gerendert und das alte Audio geleert
+    audio_input = st.audio_input("Sprechen", key=f"audio_{st.session_state.audio_counter}")
 
-    # WICHTIG: wenn kein Audio vorhanden ist, Blockade lösen
-    if audio_input is None:
-        st.session_state.audio_processed = False
-
-    if audio_input and not st.session_state.audio_processed:
-        st.session_state.audio_processed = True
+    if audio_input:
         text = transcribe_audio(audio_input.read())
         if "fehlgeschlagen" not in text:
             st.session_state.messages.append({"role": "user", "content": f"[Audio] {text}"})
@@ -345,16 +343,15 @@ if voice_method == "Browser Native":
             st.session_state.messages.append({"role": "assistant", "content": resp})
             db_save_message("assistant", resp, context_mode)
 
+            # Counter erhöhen, damit beim nächsten Rerun ein neues Widget mit leerem State kommt
+            st.session_state.audio_counter += 1
+
             st.rerun()
 else:
-    upl = st.file_uploader("Upload", type=['wav', 'mp3'], label_visibility="collapsed")
+    # WICHTIG: Eindeutiger Key auch für File Upload
+    upl = st.file_uploader("Upload", type=['wav', 'mp3'], label_visibility="collapsed", key=f"upload_{st.session_state.audio_counter}")
 
-    # WICHTIG: wenn kein Upload vorhanden ist, Blockade lösen
-    if upl is None:
-        st.session_state.audio_processed = False
-
-    if upl and not st.session_state.audio_processed:
-        st.session_state.audio_processed = True
+    if upl:
         text = transcribe_audio(upl.read())
         if "fehlgeschlagen" not in text:
             st.session_state.messages.append({"role": "user", "content": f"[Audio] {text}"})
@@ -364,6 +361,9 @@ else:
 
             st.session_state.messages.append({"role": "assistant", "content": resp})
             db_save_message("assistant", resp, context_mode)
+
+            # Counter erhöhen
+            st.session_state.audio_counter += 1
 
             st.rerun()
 
